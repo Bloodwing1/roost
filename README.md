@@ -58,20 +58,25 @@ notifications, bots, server-side voice relays (SFU) for very large groups.
 
 ## Deployment
 
-### Your NAS (Docker / Docker Compose)
+### Your NAS (Docker / Docker Compose) — easiest
 
-Roost ships as a single container that stores everything in `/data` inside the container
+Use the pre-built image, no building required:
+
+```bash
+docker compose -f docker-compose.nas.yml up -d
+```
+
+Works for both Intel/AMD64 and ARM64 NAS models (multi-arch image). Every push to
+`main` automatically rebuilds and publishes the image to
+`ghcr.io/bloodwing1/roost:latest`; watch the Actions tab and re-pull then recreate
+the container to update. All app data lives in `/data` inside the container
 (mapped to a persistent volume or bind mount).
+
+Or the built-from-source variant (requires the repo contents on the NAS):
 
 ```bash
 docker compose up -d --build
 ```
-
-Then open http://YOUR-NAS-IP:3000 in a browser. On your UGREEN NAS you can use the
-built-in "Docker" app: create a compose project and paste `docker-compose.yml`.
-
-- Host port: 3000 (change it in `docker-compose.yml` if taken)
-- Database lives in the `roost-data` volume; back that volume up to back up your chat
 
 ### First run
 

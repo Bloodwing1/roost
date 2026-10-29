@@ -1,0 +1,12 @@
+services:
+  roost:
+    image: ghcr.io/bloodwing1/roost:latest
+    container_name: roost
+    ports:
+      - "3000:3000"
+    volumes:
+      - roost-data:/data
+    restart: unless-stopped
+
+volumes:
+  roost-data:
