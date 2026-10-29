@@ -1,0 +1,15 @@
+services:
+  roost:
+    build: .
+    image: roost:local
+    container_name: roost
+    ports:
+      - "3000:3000"
+    volumes:
+      - roost-data:/data
+    restart: unless-stopped
+    environment:
+      - ROOST_COOKIE_SECURE=0
+
+volumes:
+  roost-data:

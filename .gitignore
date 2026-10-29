@@ -1,0 +1,6 @@
+roost
+roost.exe
+data/
+*.db
+*.db-shm
+*.db-wal
