@@ -38,8 +38,13 @@ func (s *server) seedDefaults() error {
 	}
 	if n == 0 {
 		now := time.Now().Unix()
-		for _, name := range []string{"general", "off-topic"} {
-			if _, err := s.db.Exec(`INSERT INTO channels (name, position, created_at) VALUES (?, ?, ?)`, name, now, now); err != nil {
+		seeds := []struct{ name, ctype string }{
+			{"general", "text"},
+			{"off-topic", "text"},
+			{"meet", "voice"},
+		}
+		for _, sd := range seeds {
+			if _, err := s.db.Exec(`INSERT INTO channels (name, type, position, created_at) VALUES (?, ?, ?, ?)`, sd.name, sd.ctype, now, now); err != nil {
 				return err
 			}
 		}

@@ -12,6 +12,7 @@ import (
 type channel struct {
 	ID      int64  `json:"id"`
 	Name    string `json:"name"`
+	Type    string `json:"type"`
 	Created int64  `json:"created_at"`
 }
 
@@ -29,7 +30,7 @@ type message struct {
 func (s *server) handleChannels(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		rows, err := s.db.Query(`SELECT id, name, created_at FROM channels ORDER BY position, id`)
+		rows, err := s.db.Query(`SELECT id, name, type, created_at FROM channels ORDER BY position, id`)
 		if err != nil {
 			writeErr(w, 500, "db error")
 			return
@@ -38,7 +39,7 @@ func (s *server) handleChannels(w http.ResponseWriter, r *http.Request) {
 		list := []channel{}
 		for rows.Next() {
 			var c channel
-			if err := rows.Scan(&c.ID, &c.Name, &c.Created); err == nil {
+			if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.Created); err == nil {
 				list = append(list, c)
 			}
 		}
@@ -51,9 +52,17 @@ func (s *server) handleChannels(w http.ResponseWriter, r *http.Request) {
 		}
 		var body struct {
 			Name string `json:"name"`
+			Type string `json:"type"`
 		}
 		if err := readJSON(w, r, &body); err != nil {
 			writeErr(w, 400, err.Error())
+			return
+		}
+		if body.Type == "" {
+			body.Type = "text"
+		}
+		if body.Type != "text" && body.Type != "voice" {
+			writeErr(w, 400, "channel type must be text or voice")
 			return
 		}
 		name := strings.ToLower(strings.TrimSpace(body.Name))
@@ -62,7 +71,7 @@ func (s *server) handleChannels(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		now := time.Now().Unix()
-		res, err := s.db.Exec(`INSERT INTO channels (name, position, created_at) VALUES (?, ?, ?)`, name, now, now)
+		res, err := s.db.Exec(`INSERT INTO channels (name, type, position, created_at) VALUES (?, ?, ?, ?)`, name, body.Type, now, now)
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				writeErr(w, 409, "channel already exists")
@@ -72,7 +81,7 @@ func (s *server) handleChannels(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id, _ := res.LastInsertId()
-		c := channel{ID: id, Name: name, Created: now}
+		c := channel{ID: id, Name: name, Type: body.Type, Created: now}
 		s.hub.broadcast(map[string]any{"t": "channel:new", "channel": c})
 		writeJSON(w, 201, c)
 	default:
@@ -116,7 +125,7 @@ func (s *server) handleChannelSub(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleChannelGet(w http.ResponseWriter, r *http.Request, id int64) {
 	var c channel
-	err := s.db.QueryRow(`SELECT id, name, created_at FROM channels WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Created)
+	err := s.db.QueryRow(`SELECT id, name, type, created_at FROM channels WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Type, &c.Created)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeErr(w, 404, "channel not found")
 		return
@@ -208,9 +217,13 @@ func (s *server) handleChannelPostMessage(w http.ResponseWriter, r *http.Request
 		writeErr(w, 400, "message too long")
 		return
 	}
-	var exists int
-	if err := s.db.QueryRow(`SELECT 1 FROM channels WHERE id = ?`, channelID).Scan(&exists); err != nil {
+	var ctype string
+	if err := s.db.QueryRow(`SELECT type FROM channels WHERE id = ?`, channelID).Scan(&ctype); err != nil {
 		writeErr(w, 404, "channel not found")
+		return
+	}
+	if ctype == "voice" {
+		writeErr(w, 400, "voice channels have no messages")
 		return
 	}
 	now := time.Now().Unix()

@@ -10,17 +10,51 @@ Named "Roost" — a place where birds gather.
 - Accounts with hashed passwords (bcrypt), invite-only registration after the first user
 - First registered user automatically becomes the admin
 - Text channels with live messages over WebSocket
+- **Voice channels with real WebRTC audio**: join/leave, mute, speaking indicators.
+  Audio flows peer-to-peer (directly between browsers), the server only does
+  signaling — so even a NAS CPU stays idle.
 - Message history with pagination, edit and delete (own messages; admins can delete any)
 - Typing indicators and online presence
 - Member list with online status and admin badges
-- Admin panel: create/delete channels, create/revoke invite codes
+- Admin panel: create/delete channels (text or voice), create/revoke invite codes
 - Dark, Discord-like web UI — no build tools, plain HTML/CSS/JS
 - Everything in one Go binary + one SQLite database file
 
+## Voice chat
+
+Voice is peer-to-peer WebRTC inside your browser. Everyone in a voice channel
+connects directly to each other; Roost just introduces them (signaling) and shows
+who is talking. Consequences:
+
+- Mic permission: the browser asks once per device.
+- The talking ring around avatars is computed locally from the audio streams.
+- Best audio: use headphones (prevents echo). Echo cancellation is on by default.
+- Scale: a mesh is comfortable up to ~6-8 people in one voice channel.
+
+### Where voice works
+
+- **localhost** — always works (browsers treat localhost as secure).
+- **LAN over plain HTTP** (`http://nas-ip:3000`) — browsers block microphones on
+  insecure origins. Two options:
+  1. The supported workaround per browser: in Chrome/Edge enable
+     "unsafely treat insecure origin as secure" for `http://<nas-ip>:3000`
+     (chrome://flags/#unsafely-treat-insecure-origin-as-secure, restart), or use the app
+     on a trusted internal domain with HTTPS.
+  2. Skip LAN HTTP entirely and go through Tailscale (recommended, next point).
+- **Tailscale / VPN (recommended)** — install Tailscale on the NAS, then
+  `tailscale serve https / http://127.0.0.1:3000` exposes a valid
+  `https://roost.your-tailnet.ts.net` URL. That is a secure context, so voice works,
+  and it reaches your Roost from anywhere without opening ports.
+- **Reverse proxy with TLS** (Traefik/Caddy/Let's Encrypt) — valid HTTPS is a secure
+  context; also set `ROOST_COOKIE_SECURE=1`.
+
+STUN servers (Google's public STUN) are used for NAT traversal; audio itself never
+flows through them.
+
 ## Not (yet) part of it
 
-Voice/video, direct messages, file uploads, markdown, push notifications, bots.
-Think of it as a self-hosted group chat, not a full Discord replacement — yet.
+Video calls/screensharing, direct messages, file uploads, markdown, push
+notifications, bots, server-side voice relays (SFU) for very large groups.
 
 ## Deployment
 

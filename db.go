@@ -41,6 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE TABLE IF NOT EXISTS channels (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	type TEXT NOT NULL DEFAULT 'text',
 	position INTEGER NOT NULL DEFAULT 0,
 	created_at INTEGER NOT NULL
 );
@@ -61,6 +62,33 @@ CREATE TABLE IF NOT EXISTS invites (
 	created_at INTEGER NOT NULL
 );
 `
-	_, err := db.Exec(schema)
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+	return migrateAddColumnType(db)
+}
+
+func migrateAddColumnType(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(channels)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "type" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = db.Exec(`ALTER TABLE channels ADD COLUMN type TEXT NOT NULL DEFAULT 'text'`)
 	return err
 }
